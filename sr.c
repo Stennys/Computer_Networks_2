@@ -125,66 +125,63 @@ void A_input(struct pkt packet)
   /* if received ACK is not corrupted */ 
   if (!IsCorrupted(packet)) {
     if (TRACE > 0)
-      printf("----A: uncorrupted ACK %d is received\n",packet.acknum);
-    total_ACKs_received++;
+        printf("----A: uncorrupted ACK %d is received\n",packet.acknum);
+    
+  total_ACKs_received++;
 
-    /* check if new ACK or duplicate */
-    if (windowcount != 0) {
-          int seqfirst = buffer[windowfirst].seqnum;
-          int seqlast = buffer[windowlast].seqnum;
-          /* check case when seqnum has and hasn't wrapped */
-          if (((seqfirst <= seqlast) && (packet.acknum >= seqfirst && packet.acknum <= seqlast)) ||
-              ((seqfirst > seqlast) && (packet.acknum >= seqfirst || packet.acknum <= seqlast))) {
-
-
-          if (windowcount > 0){
-            reset_hardware_timer();
-          }
-
-            /* packet is a new ACK */
-            if (TRACE > 0)
-              printf("----A: ACK %d is not a duplicate\n",packet.acknum);
-            new_ACKs++;
-
-            /* Need to find which timer has to be stopped */
-            int i;
-            for (i = 0; i < WINDOWSIZE; i++){
-              if (buffer[i].seqnum == packet.acknum) {
-                timesBuffer[i] = -1;
-                printf(">>> A_input() stopped timer for slot %d (seq=%d)\n", i, packet.acknum);
-                break;
-            }
-          }
-
-
-            /* cumulative acknowledgement - determine how many packets are ACKed */
-            if (packet.acknum >= seqfirst)
-              ackcount = packet.acknum + 1 - seqfirst;
-            else
-              ackcount = SEQSPACE - seqfirst + packet.acknum;
-
-	    /* slide window by the number of packets ACKed */
-            windowfirst = (windowfirst + ackcount) % WINDOWSIZE;
-
-            /* delete the acked packets from window buffer */
-            for (i=0; i<ackcount; i++)
-              windowcount--;
-
-	    /* start timer again if there are still more unacked packets in window */
-            
-
-      
-
-          }
-        }
-        else
-          if (TRACE > 0)
-        printf ("----A: duplicate ACK received, do nothing!\n");
+  if (!isInWindow(packet.acknum, buffer[windowfirst].seqnum)){
+    printf("----A: ACK %d out of window, ignoring\n", packet.acknum);
+    return;
   }
-  else 
-    if (TRACE > 0)
-      printf ("----A: corrupted ACK is received, do nothing!\n");
+
+  /*get pos of uncorropted ack*/
+
+  int offset = (packet.acknum - buffer[windowfirst].seqnum + SEQSPACE) % SEQSPACE;
+
+  int idx = (windowfirst + offset) % WINDOWSIZE;
+
+  
+  /*mark its position as being acked and check if dupli*/
+
+  if (!ackedArray[idx]){
+  
+  ackedArray[idx] = true;
+
+  /*stop timmer*/
+
+  timesBuffer[idx] = -1;
+
+  /* slide along window */
+
+  new_ACKs++;
+
+  if (TRACE>0) printf(">>> marked slot %d (seq=%d) as ACKed\n", idx, packet.acknum);
+  
+  } else if (TRACE > 0){
+
+    printf("----A: duplicate ACK %d\n", packet.acknum);
+
+  }
+
+  /*Slide window forward as far as allowed*/
+  while (windowcount > 0 && ackedArray[windowfirst]) {
+
+      ackedArray[windowfirst] = false;
+
+      windowfirst = (windowfirst + 1) % WINDOWSIZE;
+
+      windowcount--;
+
+      if (TRACE>0) printf(">>> base has been slide to slot %d\n", windowfirst);
+
+    }
+
+    if (windowcount > 0){
+      reset_hardware_timer();
+    }
+  }
 }
+
 
 /* called when A's timer goes off */
 void A_timerinterrupt(void)
@@ -254,7 +251,8 @@ void A_init(void)
 
 static int expectedseqnum; /* the sequence number expected next by the receiver */
 static int B_nextseqnum;   /* the sequence number for the next packets sent by B */
-
+static int BsBuffer[WINDOWSIZE]; /*B's Buffer*/
+static int BsRecieved[WINDOWSIZE]; /*Recived requested packets sender to send*/
 
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 void B_input(struct pkt packet)
@@ -263,9 +261,14 @@ void B_input(struct pkt packet)
   int i;
 
   /* if not corrupted and received packet is in order */
-  if  ( (!IsCorrupted(packet))  && (packet.seqnum == expectedseqnum) ) {
+  if  ( (!IsCorrupted(packet))  && isInWindow(packet.seqnum, expectedseqnum) ) {
     if (TRACE > 0)
       printf("----B: packet %d is correctly received, send ACK!\n",packet.seqnum);
+
+
+
+    BsBuffer[packet.seqnum] = packet;
+
     packets_received++;
 
     /* deliver to receiving application */
@@ -343,4 +346,14 @@ void reset_hardware_timer(void){
     hardwareTimerVal = next_timeout;
     hardwareTimerRunning = 1;
   }
+}
+
+
+/*Function to check if recived packet is in the window*/
+
+bool isInWindow(seqnum, expectedseqnum){
+
+  int dist = (seqnum - expectedseqnum + SEQSPACE) % SEQSPACE;
+
+  return (dist >= 0 && dist < WINDOWSIZE);
 }
