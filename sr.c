@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "emulator.h"
-#include "gbn.h"
+#include "sr.h"
 
 
 /* ******************************************************************
@@ -33,6 +33,18 @@
    original checksum.  This procedure must generate a different checksum to the original if
    the packet is corrupted.
 */
+/********* Sender (A) variables and functions ************/
+
+static struct pkt buffer[WINDOWSIZE];  /* array for storing packets waiting for ACK */
+static int windowfirst, windowlast;    /* array indexes of the first/last packet awaiting ACK */
+static int windowcount;                /* the number of packets currently awaiting an ACK */
+static int A_nextseqnum;               /* the next sequence number to be used by the sender */
+
+static double timesBuffer[WINDOWSIZE]; /*For checking if packet is expired aka need to resend*/
+static bool ackedArray[WINDOWSIZE];
+static double hardwareTimerVal;
+static int hardwareTimerRunning;
+
 int ComputeChecksum(struct pkt packet)
 {
   int checksum = 0;
@@ -84,16 +96,7 @@ void reset_hardware_timer(void){
   }
 }
 
-/********* Sender (A) variables and functions ************/
 
-static struct pkt buffer[WINDOWSIZE];  /* array for storing packets waiting for ACK */
-static int windowfirst, windowlast;    /* array indexes of the first/last packet awaiting ACK */
-static int windowcount;                /* the number of packets currently awaiting an ACK */
-static int A_nextseqnum;               /* the next sequence number to be used by the sender */
-static double timesBuffer[WINDOWSIZE]; /*For checking if packet is expired aka need to resend*/
-static bool ackedArray[WINDOWSIZE];
-static double hardwareTimerVal;
-static int hardwareTimerRunning;
 /* called from layer 5 (application layer), passed the message to be sent to other side */
 void A_output(struct msg message)
 {
