@@ -216,9 +216,9 @@ void A_input(struct pkt packet)
 
 
 /* called when A's timer goes off */
+// In A_timerinterrupt function:
 void A_timerinterrupt(void)
 { 
-
   printf(">>> A_timerinterrupt fired (hwTimerVal=%f)\n", hardwareTimerVal);
   
   int i;
@@ -226,31 +226,58 @@ void A_timerinterrupt(void)
   printf(">>> [TIME: %.3f] A_timerinterrupt() called. Timer expired.\n", curr_time);
 
   if (TRACE > 0)
-    printf("----A: time out,resend packet!\n");
-  /* Sub all active hardware timers  */
-  for(i=0; i<windowcount; i++) {
-    if(timesBuffer[i] >= 0){
-      timesBuffer[i] = timesBuffer[i] - curr_time;
+    printf("----A: time out, resend packet!\n");
+  
+  // Adjust times for all active packets
+  for(i = 0; i < windowcount; i++) {
+    int idx = (windowfirst + i) % WINDOWSIZE;
+    if(timesBuffer[idx] >= 0) {
+      timesBuffer[idx] -= curr_time;
     }
   }
-  /*If hardware timer is less then zero or past then we need to retransmit*/
-  for (i = 0; i < windowcount; i++){
-    if(timesBuffer[i] <= 0){
-      printf(">>> retransmitting slot %d (seq=%d)\n", i, buffer[i].seqnum);
-      tolayer3(A,buffer[i]);
-      timesBuffer[i] = RTT;
+  
+  // Retransmit expired packets
+  for(i = 0; i < windowcount; i++) {
+    int idx = (windowfirst + i) % WINDOWSIZE;
+    if(timesBuffer[idx] <= 0) {
+      printf(">>> retransmitting slot %d (seq=%d)\n", idx, buffer[idx].seqnum);
+      tolayer3(A, buffer[idx]);
+      timesBuffer[idx] = RTT; // Reset timer for this packet
       packets_resent++;
     }
   }
-    hardwareTimerRunning = 0;
-    reset_hardware_timer();
   
+  hardwareTimerRunning = 0;
+  reset_hardware_timer();
+}
 
-
-    if (TRACE > 0)
-      printf ("---A: resending packet %d\n", (buffer[(windowfirst+i) % WINDOWSIZE]).seqnum);
-
+// Updated reset_hardware_timer function:
+void reset_hardware_timer(void) {
+  if (hardwareTimerRunning) {
+    stoptimer(A);
+    hardwareTimerRunning = 0;
   }
+
+  if (windowcount == 0) {
+    return;
+  }
+
+  double next_timeout = -1;
+  for (int i = 0; i < windowcount; i++) {
+    int idx = (windowfirst + i) % WINDOWSIZE;
+    if (timesBuffer[idx] >= 0) {
+      if (next_timeout < 0 || timesBuffer[idx] < next_timeout) {
+        next_timeout = timesBuffer[idx];
+      }
+    }
+  }
+
+  if (next_timeout >= 0) {
+    starttimer(A, next_timeout);
+    hardwareTimerVal = next_timeout;
+    hardwareTimerRunning = 1;
+  }
+}
 
 
 
