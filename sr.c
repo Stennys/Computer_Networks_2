@@ -46,6 +46,17 @@ int ComputeChecksum(struct pkt packet)
   return checksum;
 }
 
+
+/*Function to check if recived packet is in the window*/
+
+bool isInWindow(int seqnum, int expectedseqnum){
+
+  int dist = (seqnum - expectedseqnum + SEQSPACE) % SEQSPACE;
+
+  return (dist >= 0 && dist < WINDOWSIZE);
+}
+
+
 bool IsCorrupted(struct pkt packet)
 {
   if (packet.checksum == ComputeChecksum(packet))
@@ -54,6 +65,24 @@ bool IsCorrupted(struct pkt packet)
     return (true);
 }
 
+void reset_hardware_timer(void){
+
+
+  if (hardwareTimerRunning){
+    stoptimer(A);
+    hardwareTimerRunning = 0;
+  }
+
+  /*find next timer to time out*/
+  double next_timeout = timesBuffer[windowfirst];
+
+  /* create and start hardware timer */
+  if ((next_timeout < 1e3) && (windowcount > 0)){
+    starttimer(A, next_timeout);
+    hardwareTimerVal = next_timeout;
+    hardwareTimerRunning = 1;
+  }
+}
 
 /********* Sender (A) variables and functions ************/
 
@@ -129,7 +158,7 @@ void A_input(struct pkt packet)
     
   total_ACKs_received++;
 
-  if (!isInWindow(packet.acknum, buffer[windowfirst].seqnum)){
+  if (!(isInWindow(packet.acknum, buffer[windowfirst].seqnum))){
     printf("----A: ACK %d out of window, ignoring\n", packet.acknum);
     return;
   }
@@ -251,58 +280,52 @@ void A_init(void)
 
 static int expectedseqnum; /* the sequence number expected next by the receiver */
 static int B_nextseqnum;   /* the sequence number for the next packets sent by B */
-static int BsBuffer[WINDOWSIZE]; /*B's Buffer*/
-static int BsRecieved[WINDOWSIZE]; /*Recived requested packets sender to send*/
+struct pkt BsBufferRcv[SEQSPACE]; /*B's Buffer*/
+static bool BsRecievedBefore[SEQSPACE]; /*Recived requested packets sender to send*/
 
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 void B_input(struct pkt packet)
 {
   struct pkt sendpkt;
+
   int i;
 
   /* if not corrupted and received packet is in order */
   if  ( (!IsCorrupted(packet))  && isInWindow(packet.seqnum, expectedseqnum) ) {
-    if (TRACE > 0)
-      printf("----B: packet %d is correctly received, send ACK!\n",packet.seqnum);
+    if (TRACE > 0) printf("----B: packet %d is correctly received, send ACK!\n",packet.seqnum);
+  sendpkt.acknum = packet.seqnum;
 
 
-
-    BsBuffer[packet.seqnum] = packet;
-
-    packets_received++;
-
-    /* deliver to receiving application */
-    tolayer5(B, packet.payload);
-
-    /* send an ACK for the received packet */
-    sendpkt.acknum = expectedseqnum;
-
-    /* update state variables */
-    expectedseqnum = (expectedseqnum + 1) % SEQSPACE;        
-  }
-  else {
-    /* packet is corrupted or out of order resend last ACK */
-    if (TRACE > 0) 
-      printf("----B: packet corrupted or not expected sequence number, resend ACK!\n");
-    if (expectedseqnum == 0)
-      sendpkt.acknum = SEQSPACE - 1;
-    else
-      sendpkt.acknum = expectedseqnum - 1;
+  if (!BsRecievedBefore[packet.seqnum]){
+    BsBufferRcv[packet.seqnum] = packet;
+    BsRecievedBefore[packet.seqnum] = true;
+    if (TRACE>0) printf("-------B buffering pkt %d\n", packet.seqnum);
+  } else {
+    if (TRACE >0) printf("-------B dup pkt 5d\n", packet.seqnum);
   }
 
-  /* create packet */
+  while (BsRecievedBefore[expectedseqnum]){
+    tolayer5(B, BsBufferRcv[expectedseqnum].payload);
+    if (TRACE > 0) printf("-------B Del pkt: %d\n", expectedseqnum);
+
+    BsRecievedBefore[expectedseqnum] = false; /*Del */
+    /*Move on*/
+    expectedseqnum = (expectedseqnum + 1) % SEQSPACE;
+  }
+} else {
+  /*packet is outside of window but still can use ACK*/
+  if (TRACE > 0) printf("------B out of window ACK %d\n", packet.seqnum);
+}
+
   sendpkt.seqnum = B_nextseqnum;
   B_nextseqnum = (B_nextseqnum + 1) % 2;
-    
-  /* we don't have any data to send.  fill payload with 0's */
-  for ( i=0; i<20 ; i++ ) 
-    sendpkt.payload[i] = '0';  
-
-  /* computer checksum */
-  sendpkt.checksum = ComputeChecksum(sendpkt); 
-
-  /* send out packet */
-  tolayer3 (B, sendpkt);
+  for (i = 0; i < 20; i++){
+    sendpkt.payload[i] = '0';
+  }
+  sendpkt.checksum = ComputeChecksum(sendpkt);
+  /*send acknoledge*/
+  tolayer3(B, sendpkt);
+  if (TRACE > 0) printf("-------B: Send ACK %d\n", sendpkt.acknum);
 }
 
 /* the following routine will be called once (only) before any other */
@@ -311,6 +334,10 @@ void B_init(void)
 {
   expectedseqnum = 0;
   B_nextseqnum = 1;
+  int i;
+  for (i = 0; i < SEQSPACE; i++){
+    BsRecievedBefore[i] = false;
+  }
 }
 
 /******************************************************************************
@@ -329,31 +356,5 @@ void B_timerinterrupt(void)
 
 /* Hardware timer helper functions*/
 
-void reset_hardware_timer(void){
 
 
-  if (hardwareTimerRunning){
-    stoptimer(A);
-    hardwareTimerRunning = 0;
-  }
-
-  /*find next timer to time out*/
-  double next_timeout = timesBuffer[windowfirst];
-
-  /* create and start hardware timer */
-  if ((next_timeout < 1e3) && (windowcount > 0)){
-    starttimer(A, next_timeout);
-    hardwareTimerVal = next_timeout;
-    hardwareTimerRunning = 1;
-  }
-}
-
-
-/*Function to check if recived packet is in the window*/
-
-bool isInWindow(seqnum, expectedseqnum){
-
-  int dist = (seqnum - expectedseqnum + SEQSPACE) % SEQSPACE;
-
-  return (dist >= 0 && dist < WINDOWSIZE);
-}
