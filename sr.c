@@ -4,6 +4,7 @@
 #include "emulator.h"
 #include "gbn.h"
 
+
 /* ******************************************************************
    Go Back N protocol.  Adapted from J.F.Kurose
    ALTERNATING BIT AND GO-BACK-N NETWORK EMULATOR: VERSION 1.2  
@@ -60,7 +61,10 @@ static struct pkt buffer[WINDOWSIZE];  /* array for storing packets waiting for 
 static int windowfirst, windowlast;    /* array indexes of the first/last packet awaiting ACK */
 static int windowcount;                /* the number of packets currently awaiting an ACK */
 static int A_nextseqnum;               /* the next sequence number to be used by the sender */
-
+static double timesBuffer[WINDOWSIZE]; /*For checking if packet is expired aka need to resend*/
+static bool ackedArray[WINDOWSIZE];
+static double hardwareTimerVal;
+static int hardwareTimerRunning;
 /* called from layer 5 (application layer), passed the message to be sent to other side */
 void A_output(struct msg message)
 {
@@ -83,16 +87,20 @@ void A_output(struct msg message)
     /* windowlast will always be 0 for alternating bit; but not for GoBackN */
     windowlast = (windowlast + 1) % WINDOWSIZE; 
     buffer[windowlast] = sendpkt;
+
+    
     windowcount++;
 
     /* send out packet */
     if (TRACE > 0)
       printf("Sending packet %d to layer 3\n", sendpkt.seqnum);
     tolayer3 (A, sendpkt);
+    timesBuffer[windowlast] = RTT;
+    
 
-    /* start timer if first packet in window */
-    if (windowcount == 1)
-      starttimer(A,RTT);
+    reset_hardware_timer();
+
+    
 
     /* get next sequence number, wrap back to 0 */
     A_nextseqnum = (A_nextseqnum + 1) % SEQSPACE;  
@@ -128,10 +136,26 @@ void A_input(struct pkt packet)
           if (((seqfirst <= seqlast) && (packet.acknum >= seqfirst && packet.acknum <= seqlast)) ||
               ((seqfirst > seqlast) && (packet.acknum >= seqfirst || packet.acknum <= seqlast))) {
 
+
+          if (windowcount > 0){
+            reset_hardware_timer();
+          }
+
             /* packet is a new ACK */
             if (TRACE > 0)
               printf("----A: ACK %d is not a duplicate\n",packet.acknum);
             new_ACKs++;
+
+            /* Need to find which timer has to be stopped */
+            int i;
+            for (i = 0; i < WINDOWSIZE; i++){
+              if (buffer[i].seqnum == packet.acknum) {
+                timesBuffer[i] = -1;
+                printf(">>> A_input() stopped timer for slot %d (seq=%d)\n", i, packet.acknum);
+                break;
+            }
+          }
+
 
             /* cumulative acknowledgement - determine how many packets are ACKed */
             if (packet.acknum >= seqfirst)
@@ -147,9 +171,9 @@ void A_input(struct pkt packet)
               windowcount--;
 
 	    /* start timer again if there are still more unacked packets in window */
-            stoptimer(A);
-            if (windowcount > 0)
-              starttimer(A, RTT);
+            
+
+      
 
           }
         }
@@ -164,22 +188,41 @@ void A_input(struct pkt packet)
 
 /* called when A's timer goes off */
 void A_timerinterrupt(void)
-{
+{ 
+
+  printf(">>> A_timerinterrupt fired (hwTimerVal=%f)\n", hardwareTimerVal);
+  
   int i;
+  double curr_time = hardwareTimerVal;
+  printf(">>> [TIME: %.3f] A_timerinterrupt() called. Timer expired.\n", curr_time);
 
   if (TRACE > 0)
-    printf("----A: time out,resend packets!\n");
-
+    printf("----A: time out,resend packet!\n");
+  /* Sub all active hardware timers  */
   for(i=0; i<windowcount; i++) {
+    if(timesBuffer[i] >= 0){
+      timesBuffer[i] = timesBuffer[i] - curr_time;
+    }
+  }
+  /*If hardware timer is less then zero or past then we need to retransmit*/
+  for (i = 0; i < windowcount; i++){
+    if(timesBuffer[i] <= 0){
+      printf(">>> retransmitting slot %d (seq=%d)\n", i, buffer[i].seqnum);
+      tolayer3(A,buffer[i]);
+      timesBuffer[i] = RTT;
+      packets_resent++;
+    }
+  }
+    hardwareTimerRunning = 0;
+    reset_hardware_timer();
+  
+
 
     if (TRACE > 0)
       printf ("---A: resending packet %d\n", (buffer[(windowfirst+i) % WINDOWSIZE]).seqnum);
 
-    tolayer3(A,buffer[(windowfirst+i) % WINDOWSIZE]);
-    packets_resent++;
-    if (i==0) starttimer(A,RTT);
   }
-}       
+
 
 
 
@@ -195,6 +238,14 @@ void A_init(void)
 		     so initially this is set to -1
 		   */
   windowcount = 0;
+  int i;
+  for (i = 0; i < WINDOWSIZE; i++) {
+    /*Negative one represent not sent*/
+    timesBuffer[i] = -1;
+    
+    ackedArray[i] = false;
+  }
+  hardwareTimerRunning = 0;
 }
 
 
@@ -273,3 +324,23 @@ void B_timerinterrupt(void)
 {
 }
 
+/* Hardware timer helper functions*/
+
+void reset_hardware_timer(void){
+
+
+  if (hardwareTimerRunning){
+    stoptimer(A);
+    hardwareTimerRunning = 0;
+  }
+
+  /*find next timer to time out*/
+  double next_timeout = timesBuffer[windowfirst];
+
+  /* create and start hardware timer */
+  if ((next_timeout < 1e3) && (windowcount > 0)){
+    starttimer(A, next_timeout);
+    hardwareTimerVal = next_timeout;
+    hardwareTimerRunning = 1;
+  }
+}
