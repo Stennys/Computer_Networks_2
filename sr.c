@@ -130,7 +130,8 @@ void A_input(struct pkt packet)
           int seqfirst = buffer[windowfirst].seqnum;
           int seqlast = buffer[windowlast].seqnum;
           /* check case when seqnum has and hasn't wrapped */
-          if (((seqfirst <= seqlast) && (packet.acknum >= seqfirst && packet.acknum <= seqlast)) || ((seqfirst > seqlast) && (packet.acknum >= seqfirst || packet.acknum <= seqlast))) {
+          if ((((seqfirst <= seqlast) && (packet.acknum >= seqfirst && packet.acknum <= seqlast)) ||
+          ((seqfirst > seqlast) && (packet.acknum >= seqfirst || packet.acknum <= seqlast)))) {
             /* packet is a new ACK */
             if (TRACE > 0)
               printf("----A: ACK %d is not a duplicate\n",packet.acknum);
@@ -160,7 +161,7 @@ void A_input(struct pkt packet)
             while (windowcount>0 && acked[windowfirst]) {
                 acked[windowfirst] = false;
                 windowfirst = (windowfirst + 1) % WINDOWSIZE;
-                printf("window num: %d\n", windowfirst);
+                /*printf("window num: %d\n", windowfirst); */
                 windowcount--;
             } 
             /*
@@ -180,12 +181,16 @@ void A_input(struct pkt packet)
           }
         }
     }
+    else
+    if (TRACE > 0)
+      printf ("----A: duplicate ACK received, do nothing!\n");
   }
   else 
   {
     if (TRACE > 0)
       printf ("----A: corrupted ACK is received, do nothing!\n");
   }
+
 }
 
 /* called when A's timer goes off */
@@ -194,7 +199,7 @@ void A_timerinterrupt(void)
 
 
   if (TRACE > 0)
-    printf("----A: time out,resend oldest packet!\n");
+  printf("----A: time out,resend packets!\n");
   /*
   for(i=0; i<windowcount; i++) {
 
@@ -209,7 +214,7 @@ void A_timerinterrupt(void)
   if (windowcount > 0)
   {
   if (TRACE > 0)
-    printf ("---A: resending oldest non ack packet %d\n", (buffer[(windowfirst) % WINDOWSIZE]).seqnum);
+    printf ("---A: resending packet %d\n", (buffer[(windowfirst) % WINDOWSIZE]).seqnum);
   tolayer3(A,buffer[(windowfirst) % WINDOWSIZE]);
   packets_resent++;
   }
@@ -269,8 +274,8 @@ void B_input(struct pkt packet)
     int seq = packet.seqnum;;
     offset = (seq - expectedseqnum + SEQSPACE) % SEQSPACE;
     if (offset < WINDOWSIZE){
-      if (TRACE > 0)
-        printf("----B: packet %d is correctly received!\n",packet.seqnum);
+      /*if (TRACE > 0)
+        printf("----B: packet %d is correctly received!\n",packet.seqnum);*/
     
     packets_received++;
 
