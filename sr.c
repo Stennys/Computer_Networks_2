@@ -308,6 +308,10 @@ void B_input(struct pkt packet)
   struct pkt sendpkt;
 
   int i;
+  if (IsCorrupted(packet)){
+    if (TRACE > 0) printf("----B: packet %d is incorrectly received, send nothing!\n",packet.seqnum);
+    return;
+  }
 
   /* if not corrupted and received packet is in order */
   if  ( (!IsCorrupted(packet))  && isInWindow(packet.seqnum, expectedseqnum) ) {
@@ -334,6 +338,7 @@ void B_input(struct pkt packet)
 } else {
   /*packet is outside of window but still can use ACK*/
   if (TRACE > 0) printf("------B out of window ACK %d\n", packet.seqnum);
+  return;
 }
 
   sendpkt.seqnum = B_nextseqnum;
