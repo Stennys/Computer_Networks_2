@@ -67,8 +67,7 @@ void A_input(struct pkt packet) {
         if(in_window && !acked[ack]) {
             acked[ack] = true;
             if(TRACE > 0) printf("----A: ACK %d received\n", ack);
-            
-           
+   
             while(acked[send_base] && window_count > 0) {
                 acked[send_base] = false;
                 send_base = (send_base + 1) % SEQSPACE;
@@ -91,14 +90,14 @@ void A_timerinterrupt() {
 void A_init() {
     send_base = 0;
     next_seq = 0;
-    int i;
     window_count = 0;
+    int i;
     for(i=0; i<SEQSPACE; i++) acked[i] = false;
 }
 
 /********** Receiver (B) **********/
 static int expected_seq = 0;
-static struct pkt rcv_buffer[SEQSPACE]; 
+static struct pkt rcv_buffer[SEQSPACE];
 
 void B_input(struct pkt packet) {
     if(!IsCorrupted(packet)) {
@@ -114,7 +113,7 @@ void B_input(struct pkt packet) {
             if(TRACE > 0) printf("----B: Received packet %d\n", seq);
             rcv_buffer[seq] = packet; 
             
-           
+          
             while(rcv_buffer[expected_seq].seqnum == expected_seq) {
                 if(TRACE > 0) printf("----B: Delivering packet %d to layer5\n", expected_seq);
                 tolayer5(B, rcv_buffer[expected_seq].payload);
@@ -122,7 +121,7 @@ void B_input(struct pkt packet) {
             }
         }
         
-      
+       
         struct pkt ack;
         ack.acknum = seq;
         ack.seqnum = NOTINUSE;
