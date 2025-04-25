@@ -203,42 +203,75 @@ void A_init(void)
 
 static int expectedseqnum; /* the sequence number expected next by the receiver */
 static int B_nextseqnum;   /* the sequence number for the next packets sent by B */
+static struct pkt rcvBuffer[WINDOWSIZE];
 
+bool correctly_recieved(struct pkt packet)
+{
+  if ((packet.seqnum >= windowfirst) && (packet.seqnum <= (windowfirst + WINDOWSIZE - 1)))
+  {
+  printf("----B sequence num %d correctly recived\n", packet.seqnum);
+    return true;
+  }
+  return false;
+}
 
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 void B_input(struct pkt packet)
 {
   struct pkt sendpkt;
   int i;
+  int packet_del = 0;
 
-  /* if not corrupted and received packet is in order */
-  if  ( (!IsCorrupted(packet))  && (packet.seqnum == expectedseqnum) ) {
+  /* if not corrupted and received packet can be in any order buffer it */
+  if  ( (!IsCorrupted(packet)) && packet.seqnum >= expectedseqnum && packet.seqnum < (expectedseqnum + WINDOWSIZE)) {
     if (TRACE > 0)
-      printf("----B: packet %d is correctly received, send ACK!\n",packet.seqnum);
+      printf("----B: packet %d is correctly received!\n",packet.seqnum);
+    
     packets_received++;
 
-    /* deliver to receiving application */
-    tolayer5(B, packet.payload);
+    /*Check to see if packet was previously recieved*/
 
+      if (!(packet.seqnum == expectedseqnum))
+      {
+        rcvBuffer[packet.seqnum % WINDOWSIZE] = packet;
+      }
+
+      if (packet.seqnum == expectedseqnum)
+      {
+        rcvBuffer[packet.seqnum % WINDOWSIZE] = packet;
+        int current_seq = expectedseqnum;
+        while (rcvBuffer[current_seq % WINDOWSIZE].seqnum == (current_seq % SEQSPACE)) {
+            tolayer5(B, rcvBuffer[current_seq % WINDOWSIZE].payload);
+            printf("----B packet %d is sent to layer 5.\n", rcvBuffer[current_seq % WINDOWSIZE].seqnum);
+            packet_del++;
+            current_seq = (current_seq + 1) % SEQSPACE; 
+        }
+      }
+      
+
+      expectedseqnum = (expectedseqnum + packet_del) % SEQSPACE;
+
+ 
     /* send an ACK for the received packet */
-    sendpkt.acknum = expectedseqnum;
+      sendpkt.acknum = packet.seqnum;
 
-    /* update state variables */
-    expectedseqnum = (expectedseqnum + 1) % SEQSPACE;        
+    
+  }
+  else if ((!IsCorrupted(packet)) && (((packet.seqnum % SEQSPACE) < (expectedseqnum % SEQSPACE) && (packet.seqnum % SEQSPACE) >= ((expectedseqnum - WINDOWSIZE) % SEQSPACE))))
+  {
+    /*DONT BUFFER*/
+    sendpkt.acknum = packet.seqnum;
   }
   else {
-    /* packet is corrupted or out of order resend last ACK */
+    /* packet is corrupted */
     if (TRACE > 0) 
-      printf("----B: packet corrupted or not expected sequence number, resend ACK!\n");
-    if (expectedseqnum == 0)
-      sendpkt.acknum = SEQSPACE - 1;
-    else
-      sendpkt.acknum = expectedseqnum - 1;
+      printf("----B: packet corrupted resend ACK!\n");
+      return;
   }
 
   /* create packet */
-  sendpkt.seqnum = B_nextseqnum;
-  B_nextseqnum = (B_nextseqnum + 1) % 2;
+  sendpkt.seqnum = packet.seqnum;
+  
     
   /* we don't have any data to send.  fill payload with 0's */
   for ( i=0; i<20 ; i++ ) 
