@@ -250,6 +250,7 @@ static int expectedseqnum; /* the sequence number expected next by the receiver 
 static int B_nextseqnum;   /* the sequence number for the next packets sent by B */
 static struct pkt rcvBuffer[WINDOWSIZE];
 
+/*
 bool correctly_recieved(struct pkt packet)
 {
   if ((packet.seqnum >= windowfirst) && (packet.seqnum <= (windowfirst + WINDOWSIZE - 1)))
@@ -259,6 +260,7 @@ bool correctly_recieved(struct pkt packet)
   }
   return false;
 }
+  */
 
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 void B_input(struct pkt packet)
@@ -274,8 +276,8 @@ void B_input(struct pkt packet)
     int seq = packet.seqnum;;
     offset = (seq - expectedseqnum + SEQSPACE) % SEQSPACE;
     if (offset < WINDOWSIZE){
-      /*if (TRACE > 0)
-        printf("----B: packet %d is correctly received!\n",packet.seqnum);*/
+      if (TRACE > 0)
+        printf("----B: packet %d is correctly received, send ACK!\n",packet.seqnum);
     
     packets_received++;
 
@@ -291,11 +293,12 @@ void B_input(struct pkt packet)
           if (rcvBuffer[expectedseqnum % WINDOWSIZE].seqnum == (expectedseqnum))
           {
             tolayer5(B, rcvBuffer[expectedseqnum % WINDOWSIZE].payload);
-            printf("----B packet %d is sent to layer 5.\n", expectedseqnum);
+            /*printf("----B packet %d is sent to layer 5.\n", expectedseqnum);*/
             /*rcvBuffer[current_seq % WINDOWSIZE].seqnum = -1;*/
             packet_del++;
             expectedseqnum = (expectedseqnum + 1) % SEQSPACE;
           } else {
+
             break;
           }
         }
@@ -324,9 +327,9 @@ void B_input(struct pkt packet)
   }
   else if ((((packet.seqnum % SEQSPACE) < (expectedseqnum % SEQSPACE) && (packet.seqnum % SEQSPACE) >= ((expectedseqnum - WINDOWSIZE) % SEQSPACE))))
   {
-    if (TRACE > 0){
-      printf("----B: duplicate packet %d received, sending ACK\n", packet.seqnum);
-    }
+    /*if (TRACE > 0){
+      /*printf("----B: duplicate packet %d received, sending ACK\n", packet.seqnum);
+    }*/
       sendpkt.acknum = packet.seqnum;
       sendpkt.seqnum = B_nextseqnum;
       
@@ -345,7 +348,7 @@ void B_input(struct pkt packet)
   else {
     /* packet is corrupted */
     if (TRACE > 0) 
-      printf("----B: packet corrupted resend ACK!\n");
+      printf("----B: packet corrupted or not expected sequence number, resend ACK!\n");
     return;
   }
 }
