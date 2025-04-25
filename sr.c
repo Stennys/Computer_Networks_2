@@ -328,7 +328,7 @@ void B_input(struct pkt packet)
   else if ((((packet.seqnum % SEQSPACE) < (expectedseqnum % SEQSPACE) && (packet.seqnum % SEQSPACE) >= ((expectedseqnum - WINDOWSIZE) % SEQSPACE))))
   {
     /*if (TRACE > 0){
-      /*printf("----B: duplicate packet %d received, sending ACK\n", packet.seqnum);
+      printf("----B: duplicate packet %d received, sending ACK\n", packet.seqnum);
     }*/
       sendpkt.acknum = packet.seqnum;
       sendpkt.seqnum = B_nextseqnum;
