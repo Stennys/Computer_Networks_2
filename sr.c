@@ -84,6 +84,8 @@ void A_output(struct msg message)
     /* put packet in window buffer */
     /* windowlast will always be 0 for alternating bit; but not for GoBackN */
     windowlast = (windowlast + 1) % WINDOWSIZE; 
+    acked[windowlast] = false;      
+    buffer[windowlast] = sendpkt;
     buffer[windowlast] = sendpkt;
     windowcount++;
     acked[windowlast] = false;
@@ -141,7 +143,7 @@ void A_input(struct pkt packet)
             int buffer_idx = -1;
             
             /*Find sequence  in terms of buffer pkt*/
-            for (i = -1; i < windowcount; i++) {
+            for (i = 0; i < windowcount; i++) {
 
               int idx = (windowfirst + i) % WINDOWSIZE;
 
@@ -159,18 +161,21 @@ void A_input(struct pkt packet)
               acked[buffer_idx] = true;  
               new_ACKs++;
 
+            
+            while (windowcount>0 && acked[windowfirst]) {
+                acked[windowfirst] = false;
+                windowfirst = (windowfirst + 1) % WINDOWSIZE;
+                printf("window num: %d\n", windowfirst);
+                windowcount--;
+            } 
             /*
-            // while (windowcount>0 && acked[windowfirst]) {
-            //     windowfirst = (windowfirst + 1) % WINDOWSIZE;
-            //     printf("window num: %d\n", windowfirst);
-            //     windowcount--;
-            // } */
             if (packet.acknum >= buffer[windowfirst].seqnum) {
               int acked_packets = (packet.acknum - buffer[windowfirst].seqnum + 1 + SEQSPACE) % SEQSPACE;
               windowfirst = (windowfirst + acked_packets) % WINDOWSIZE;
               windowcount -= acked_packets;
-              // Reset the timer if there are remaining packets
+              
           }
+              */
           
             
             stoptimer(A);
@@ -303,7 +308,7 @@ void B_input(struct pkt packet)
 
  
     /* send an ACK for the received packet */
-    sendpkt.acknum = (expectedseqnum - 1) % SEQSPACE;
+    sendpkt.acknum = (expectedseqnum + SEQSPACE - 1) % SEQSPACE;
     sendpkt.seqnum =  B_nextseqnum;
   
     
