@@ -77,19 +77,29 @@ bool IsCorrupted(struct pkt packet)
     return (true);
 }
 
-void reset_hardware_timer(void){
-
-
-  if (hardwareTimerRunning){
+void reset_hardware_timer(void) {
+  double next_timeout = -1;
+  int i;
+  if (hardwareTimerRunning) {
     stoptimer(A);
     hardwareTimerRunning = 0;
   }
 
-  /*find next timer to time out*/
-  double next_timeout = timesBuffer[windowfirst];
+  if (windowcount == 0) {
+    return;
+  }
 
-  /* create and start hardware timer */
-  if ((next_timeout < 1e3) && (windowcount > 0)){
+
+  for (i = 0; i < windowcount; i++) {
+    int idx = (windowfirst + i) % WINDOWSIZE;
+    if (timesBuffer[idx] >= 0) {
+      if (next_timeout < 0 || timesBuffer[idx] < next_timeout) {
+        next_timeout = timesBuffer[idx];
+      }
+    }
+  }
+
+  if (next_timeout >= 0) {
     starttimer(A, next_timeout);
     hardwareTimerVal = next_timeout;
     hardwareTimerRunning = 1;
@@ -151,8 +161,10 @@ void A_output(struct msg message)
 */
 void A_input(struct pkt packet)
 {
-  int ackcount = 0;
-  int i;
+
+  int offset;
+  int idx;
+
 
   /* if received ACK is not corrupted */ 
   if (!IsCorrupted(packet)) {
@@ -168,9 +180,9 @@ void A_input(struct pkt packet)
 
   /*get pos of uncorropted ack*/
 
-  int offset = (packet.acknum - buffer[windowfirst].seqnum + SEQSPACE) % SEQSPACE;
+  offset = (packet.acknum - buffer[windowfirst].seqnum + SEQSPACE) % SEQSPACE;
 
-  int idx = (windowfirst + offset) % WINDOWSIZE;
+  idx = (windowfirst + offset) % WINDOWSIZE;
 
   
   /*mark its position as being acked and check if dupli*/
@@ -216,19 +228,20 @@ void A_input(struct pkt packet)
 
 
 /* called when A's timer goes off */
-// In A_timerinterrupt function:
 void A_timerinterrupt(void)
 { 
+  int i;
+  double curr_time;
   printf(">>> A_timerinterrupt fired (hwTimerVal=%f)\n", hardwareTimerVal);
   
-  int i;
-  double curr_time = hardwareTimerVal;
+  
+  curr_time = hardwareTimerVal;
   printf(">>> [TIME: %.3f] A_timerinterrupt() called. Timer expired.\n", curr_time);
 
   if (TRACE > 0)
     printf("----A: time out, resend packet!\n");
   
-  // Adjust times for all active packets
+
   for(i = 0; i < windowcount; i++) {
     int idx = (windowfirst + i) % WINDOWSIZE;
     if(timesBuffer[idx] >= 0) {
@@ -236,13 +249,13 @@ void A_timerinterrupt(void)
     }
   }
   
-  // Retransmit expired packets
+
   for(i = 0; i < windowcount; i++) {
     int idx = (windowfirst + i) % WINDOWSIZE;
     if(timesBuffer[idx] <= 0) {
       printf(">>> retransmitting slot %d (seq=%d)\n", idx, buffer[idx].seqnum);
       tolayer3(A, buffer[idx]);
-      timesBuffer[idx] = RTT; // Reset timer for this packet
+      timesBuffer[idx] = RTT; 
       packets_resent++;
     }
   }
@@ -251,33 +264,8 @@ void A_timerinterrupt(void)
   reset_hardware_timer();
 }
 
-// Updated reset_hardware_timer function:
-void reset_hardware_timer(void) {
-  if (hardwareTimerRunning) {
-    stoptimer(A);
-    hardwareTimerRunning = 0;
-  }
 
-  if (windowcount == 0) {
-    return;
-  }
 
-  double next_timeout = -1;
-  for (int i = 0; i < windowcount; i++) {
-    int idx = (windowfirst + i) % WINDOWSIZE;
-    if (timesBuffer[idx] >= 0) {
-      if (next_timeout < 0 || timesBuffer[idx] < next_timeout) {
-        next_timeout = timesBuffer[idx];
-      }
-    }
-  }
-
-  if (next_timeout >= 0) {
-    starttimer(A, next_timeout);
-    hardwareTimerVal = next_timeout;
-    hardwareTimerRunning = 1;
-  }
-}
 
 
 
@@ -287,6 +275,7 @@ void reset_hardware_timer(void) {
 void A_init(void)
 {
   /* initialise A's window, buffer and sequence number */
+  int i;
   A_nextseqnum = 0;  /* A starts with seq num 0, do not change this */
   windowfirst = 0;
   windowlast = -1;   /* windowlast is where the last packet sent is stored.  
@@ -294,7 +283,7 @@ void A_init(void)
 		     so initially this is set to -1
 		   */
   windowcount = 0;
-  int i;
+  
   for (i = 0; i < WINDOWSIZE; i++) {
     /*Negative one represent not sent*/
     timesBuffer[i] = -1;
@@ -331,7 +320,7 @@ void B_input(struct pkt packet)
     BsRecievedBefore[packet.seqnum] = true;
     if (TRACE>0) printf("-------B buffering pkt %d\n", packet.seqnum);
   } else {
-    if (TRACE >0) printf("-------B dup pkt 5d\n", packet.seqnum);
+    if (TRACE >0) printf("-------B dup pkt %d\n", packet.seqnum);
   }
 
   while (BsRecievedBefore[expectedseqnum]){
@@ -362,9 +351,10 @@ void B_input(struct pkt packet)
 /* entity B routines are called. You can use it to do any initialization */
 void B_init(void)
 {
+  int i;
   expectedseqnum = 0;
   B_nextseqnum = 1;
-  int i;
+ 
   for (i = 0; i < SEQSPACE; i++){
     BsRecievedBefore[i] = false;
   }
