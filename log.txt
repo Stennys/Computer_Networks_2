@@ -1,0 +1,125 @@
+commit 2fbd436043b12374c2963673b23a577846a89ccc
+Author: Izak <go73yom@mytum.de>
+Date:   Sat Apr 26 00:03:39 2025 +0930
+
+    last attempt of bug testing tn
+
+commit ecdc41abd1b443f41165ba4a8ae6a4b2a6496141
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 22:49:48 2025 +0930
+
+    trying new method of removing akked array since its cause a bug
+
+commit 27cb50a72d67530fa155ee10499953d60ae2ddbf
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 21:06:15 2025 +0930
+
+    testing new code infinite loop error whilst tryna fix modulo
+
+commit 7dc18024f1904716465814a5953f4266187cd795
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 19:36:33 2025 +0930
+
+    first proper test
+
+commit e6048fedc490f36660196505e543b2367f3381df
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 19:33:50 2025 +0930
+
+    bug testing removed all warning for oracle added now old prints pt2
+
+commit 1d7fe563ec20d2c70ec0cd00f641f4a8b3a3e2e1
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 19:27:29 2025 +0930
+
+    bug testing removed all warning for oracle added now old prints
+
+commit 9120510662af102f56017ef6b04ef6e8d51238ec
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 19:18:23 2025 +0930
+
+    bug testing removed all warning for oracle
+
+commit e245f8c63c36d37e2493ca67c9ca6bd84bf3bcbd
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 19:13:10 2025 +0930
+
+    bug testing
+
+commit d5257d7f7437cc0dc1c84b6602a674cca0600a1b
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 19:00:47 2025 +0930
+
+    testing on oracle
+
+commit 8c46eea1acf1144cdb4169cc8b81495edf615576
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 17:13:04 2025 +0930
+
+    working mostly have to fix sliding of window as not sliding and modulo isnt correct
+
+commit 9917ed37bbe3fb0cec31ae966c895b68bca2110c
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 15:32:43 2025 +0930
+
+    working reciever deals with out of order packets and buffers them will need to implement timers to be 100% sure
+
+commit 3351d399786843cdbfd1a2e3b7638a8b1a66980c
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 13:57:15 2025 +0930
+
+    Restarting
+
+commit d378ff72797ba0560c835a918f2dd88b6fff8d86
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 11:39:14 2025 +0930
+
+    fixed bug where when packet was corrupted still sent ack
+
+commit 97b223756f8fa7dd6c53b8d5cb59c93f1f1fc1db
+Author: Izak <go73yom@mytum.de>
+Date:   Fri Apr 25 11:24:31 2025 +0930
+
+    fixed all c90 warnings added better coding style
+
+commit 4214e30f09739f8c08253daae238a65a937cd814
+Author: Izak <go73yom@mytum.de>
+Date:   Wed Apr 23 18:29:38 2025 +0930
+
+    new test pt3 hopefully fixed A_interupts and wokring hardware timer reset
+
+commit 46aa344943c67ac1248e1ba9efd23d759984096b
+Author: Izak <go73yom@mytum.de>
+Date:   Wed Apr 23 18:19:09 2025 +0930
+
+    new test pt2 fixed bool library not being include
+
+commit 50aa9dc16d0341c4ffca001cba3a7cb1d4fd318c
+Author: Izak <go73yom@mytum.de>
+Date:   Wed Apr 23 18:17:24 2025 +0930
+
+    new test
+
+commit 8c6c646edcf2a4e27c761321310201c0781f87df
+Author: Izak <go73yom@mytum.de>
+Date:   Wed Apr 23 18:12:51 2025 +0930
+
+    testing
+
+commit eeedd19e4e98b456f6cc9ddda8f16915859e9f81
+Author: Izak <go73yom@mytum.de>
+Date:   Wed Apr 23 16:52:35 2025 +0930
+
+    followed guidelines in workshop two for A_input should not be cumminlative anymore
+
+commit acb62c0402bed4c581cd6c855432b7e039909c5d
+Author: Izak <go73yom@mytum.de>
+Date:   Wed Apr 23 15:44:40 2025 +0930
+
+    added timers somewhat working more testing required
+
+commit 797eecfe1b94d6a770e2208d42ab9f7b6ebb94b6
+Author: Stennys <83564697+Stennys@users.noreply.github.com>
+Date:   Tue Apr 22 20:07:12 2025 +0930
+
+    intial commit

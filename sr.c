@@ -131,7 +131,7 @@ void A_input(struct pkt packet)
     /* check if new ACK or duplicate */
     if (windowcount != 0) 
     {
-          int ack_num = packet.acknum;
+
           int seqfirst = buffer[windowfirst].seqnum;
           int seqlast = buffer[windowlast].seqnum;
           /* check case when seqnum has and hasn't wrapped */
@@ -222,7 +222,7 @@ void A_timerinterrupt(void)
 void A_init(void)
 {
   /* initialise A's window, buffer and sequence number */
-  int i;
+
   A_nextseqnum = 0;  /* A starts with seq num 0, do not change this */
   windowfirst = 0;
   windowlast = -1;   /* windowlast is where the last packet sent is stored.  
@@ -249,9 +249,9 @@ void B_input(struct pkt packet)
 {
   struct pkt sendpkt;
   int i;
-  int packet_del = 0;
-  int buffer_idx = 0;
-
+  int buffer_idx;
+  int seq;
+  bool in_window;
 
   /* if not corrupted and received packet can be in any order buffer it */
   if  ((!IsCorrupted(packet))) 
@@ -280,15 +280,11 @@ void B_input(struct pkt packet)
     /* send out packet */
     tolayer3 (B, sendpkt);
 
-    int buffer_idx = (expectedseqnum - 1 + WINDOWSIZE) % SEQSPACE;
+    buffer_idx = (expectedseqnum - 1 + WINDOWSIZE) % SEQSPACE;
 
-    int seq = packet.seqnum;
-
-    int window_start = expectedseqnum;
-
-    int window_end = (expectedseqnum + WINDOWSIZE) % SEQSPACE;
+    seq = packet.seqnum;
     
-    bool in_window = (((expectedseqnum <= buffer_idx) && (packet.seqnum >= expectedseqnum && packet.seqnum <= buffer_idx)) ||
+    in_window = (((expectedseqnum <= buffer_idx) && (packet.seqnum >= expectedseqnum && packet.seqnum <= buffer_idx)) ||
     ((expectedseqnum > buffer_idx) && (packet.seqnum >= expectedseqnum || packet.seqnum <= buffer_idx)));
 
 
@@ -321,7 +317,6 @@ void B_input(struct pkt packet)
 /* entity B routines are called. You can use it to do any initialization */
 void B_init(void)
 {
-  int i = 0;
   expectedseqnum = 0;
   B_nextseqnum = 1;
   bWindowStart = 0;
