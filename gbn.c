@@ -168,7 +168,7 @@ void A_timerinterrupt(void)
   int i;
 
   if (TRACE > 0)
-    printf("----A: time out,resend packets!\n");
+    printf("----A: time out,resend oldest packet!\n");
 
   for(i=0; i<windowcount; i++) {
 
